@@ -65,6 +65,16 @@ async def show_list(message: Message):
     await message.answer(f"📋 Всего объявлений: {len(ads)}")
 
 
+@dp.callback_query(F.data == "save_text")
+async def save_text_callback(query: CallbackQuery):
+    await query.message.edit_text("✅ Ваше объявление сохранено!")
+    await query.answer()
+
+@dp.callback_query(F.data == "cancel_text")
+async def cancel_text_callback(query: CallbackQuery):
+    await query.message.edit_text("❌ Отменить")
+    await query.answer()
+
 @dp.message()
 async def message_handler(message: Message):
     """Обрабатываем входящие сообщения для создания объявлений"""
@@ -86,7 +96,8 @@ async def message_handler(message: Message):
 
         ads.append(new_ad)
         save_ads(ads)
-        await message.answer("✅ Ваше текстовое объявление сохранено!")
+        #await message.answer("✅ Текстовое объявление сохранено!") как вариант без кнопки
+
 
     elif message.photo:
         # Фото объявление
@@ -118,6 +129,8 @@ async def message_handler(message: Message):
 
     else:
         await message.answer("❌ Пожалуйста, отправьте текст, фото или аудио для объявления.")
+
+
 
 
 async def main():

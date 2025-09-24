@@ -100,5 +100,26 @@
     "content": "fgfg",
     "user_id": 6469651871,
     "user": "Борис"
+  },
+  {
+    "id": 16,
+    "type": "text",
+    "content": "ddfdf",
+    "user_id": 6469651871,
+    "user": "Борис"
+  },
+  {
+    "id": 17,
+    "type": "text",
+    "content": "rtfgfg",
+    "user_id": 6469651871,
+    "user": "Борис"
+  },
+  {
+    "id": 18,
+    "type": "text",
+    "content": "авава",
+    "user_id": 6469651871,
+    "user": "Борис"
   }
 ]
