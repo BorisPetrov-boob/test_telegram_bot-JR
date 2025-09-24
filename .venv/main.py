@@ -14,26 +14,11 @@ from keyboards.inline import save_cancel_kb
 
 import logging
 
+bot = Bot(TOKEN)  # Создаем бота
+dp = Dispatcher()  # Создаем диспетчер
 
 
-bot = Bot(TOKEN) #Создаем бота
-dp = Dispatcher() #Создаем диспетчер
-
-AUDIO_JSON_FILE="audio.json"
-PHOTOS_JSON_FILE = "photos.json"
-TEXT_JSON_FILE = "texts.json"
-
-
-class PhotoState(StatesGroup):
-    waiting_for_description = State()
-
-class TextState(StatesGroup):
-    waiting_for_confirmatio = State()
-
-
-
-
-@dp.message(Command('start')) #Хэндлер на команду старт (5)
+@dp.message(Command('start'))  # Хэндлер на команду старт (5)
 async def start_handler(message: Message):
     welcome_text = "Привет! Я бот для создания и управления объявлениями. Вот что я могу:\n\n" \
                    "/start - Показать это приветственное сообщение\n" \
@@ -44,108 +29,101 @@ async def start_handler(message: Message):
     await message.answer(welcome_text, reply_markup=main_menu())
 
 
-
-@dp.message(Command('help'))#Хэндлер на команду инфо (6) inline клавиатура
+@dp.message(Command('help'))  # Хэндлер на команду инфо (6) inline клавиатура
 async def help_handler(message: Message):
     help_text = (
-            "📖 Инструкция по использованию:\n\n"
-            "1. /add - создать новое объявление\n"
-            "2. /list - посмотреть все объявления\n\n"
+        "📖 Инструкция по использованию:\n\n"
+        "1. /add - создать новое объявление\n"
+        "2. /list - посмотреть все объявления\n\n"
     )
     await message.answer(help_text)
 
 
-
-@dp.message(F.text & ~F.command)
-async def text_handler(message: Message):
-    text = message.text
-
-    await message.answer("Хотите сохранить это как объявление?", reply_markup=save_cancel_kb())
-
-    data = await state.get_data()
-    file_id = data.get('file_id')
-    await state.update_data(file_id=file_id)
-
-@dp.callback_query(F.data == "save_text")
-async def save_text_callback(callback: CallbackQuery, state: FSMContext):
-    text_data = {
-        "text": text_to_save,
-        "user_id": callback.from_user.id,
-        "username": callback.from_user.username,
-        "first_name": callback.from_user.first_name,
-        "message_id": callback.message.message_id,
-        "date": callback.message.date.isoformat()
-    }
+ADS_FILE = "ads.json"
 
 
-    all_texts = load_texts()
-    all_texts.append(text_data)
-    save_texts(all_texts)
+def load_ads():
+    try:
+        with open(ADS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
 
 
-
-@dp.message(F.photo)
-async def photo_handler(message: Message, state: FSMContext):
-    photo = message.photo
-    file_id = photo.file_id
-
-    await message.answer("Добавить описание?")
-
-
-    data = await state.get_data()
-    file_id = data.get('file_id')
-
-    photo_data = {
-        "file_id": file_id,
-        "description": None,
-        "user_id": message.from_user.id,
-        "username": message.from_user.username,
-        "timestamp": message.date.isoformat(),
-        "type": "photo"
-    }
-
-    # Сохраняем в JSON
-    all_data = load_data(PHOTOS_JSON_FILE)
-    all_data.append(photo_data)
-    save_data(all_data, PHOTOS_JSON_FILE)
-
-    await message.answer("Фото сохранено без описания!")
+def save_ads(ads):
+    try:
+        with open(ADS_FILE, "w", encoding="utf-8") as f:
+            json.dump(ads, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logging.error(f"Ошибка сохранения файла: {e}")
 
 
-
-@dp.message(F.audio)#Хэндлер на аудио (9)
-async def audio_handler(message: Message):
-    audio = message.audio
-    file_id = audio.file_id
-    await message.answer('Аудио-объявление добавлено')
-
-    audio_data = {
-        "file_id": file_id,
-        "file_name": audio.file_name,
-        "duration": audio.duration,
-        "mime_type": audio.mime_type,
-        "file_size": audio.file_size,
-        "user_id": message.from_user.id,
-        "username": message.from_user.username,
-        "timestamp": message.date.isoformat(),
-        "type": "audio"
-    }
-
-    all_data = load_data(AUDIO_JSON_FILE)
-    all_data.append(audio_data)
-    save_data(all_data, AUDIO_JSON_FILE)
-
-    await message.answer("Аудио-объявление добавлено!")
+@dp.message(Command("list"))
+async def show_list(message: Message):
+    """Показываем количество объявлений"""
+    ads = load_ads()
+    await message.answer(f"📋 Всего объявлений: {len(ads)}")
 
 
+@dp.message()
+async def message_handler(message: Message):
+    """Обрабатываем входящие сообщения для создания объявлений"""
+    ads = load_ads()
+    user_id = message.from_user.id
+    username = message.from_user.username or message.from_user.full_name
+
+    await message.answer("Меню", reply_markup=save_cancel_kb())
+    await asyncio.sleep(2)
+    if message.text and not message.text.startswith('/'):
+        # Текстовое объявление
+        new_ad = {
+            "id": len(ads) + 1,
+            "type": "text",
+            "content": message.text,
+            "user_id": user_id,
+            "user": username
+        }
+
+        ads.append(new_ad)
+        save_ads(ads)
+        await message.answer("✅ Ваше текстовое объявление сохранено!")
+
+    elif message.photo:
+        # Фото объявление
+        photo = message.photo[-1]
+        new_ad = {
+            "id": len(ads) + 1,
+            "type": "photo",
+            "file_id": photo.file_id,
+            "user_id": user_id,
+            "user": username
+        }
+        ads.append(new_ad)
+        save_ads(ads)
+        await message.answer("✅ Фото объявление сохранено!")
+
+    elif message.audio:
+        # Аудио объявление
+        audio = message.audio
+        new_ad = {
+            "id": len(ads) + 1,
+            "type": "audio",
+            "file_id": audio.file_id,
+            "user_id": user_id,
+            "user": username
+        }
+        ads.append(new_ad)
+        save_ads(ads)
+        await message.answer("✅ Аудио объявление сохранено!")
+
+    else:
+        await message.answer("❌ Пожалуйста, отправьте текст, фото или аудио для объявления.")
 
 
+async def main():
+    logging.basicConfig(level=logging.INFO)
+    await dp.start_polling(bot)
 
 
-
-async def main(): #точка входа (1)
-    logging.basicConfig(level=logging.INFO) #Логирование (2)
-    await dp.start_polling(bot) #Запускаем поллинг (4)
-
-asyncio.run(main())
-
+if __name__ == "__main__":
+    asyncio.run(main())
